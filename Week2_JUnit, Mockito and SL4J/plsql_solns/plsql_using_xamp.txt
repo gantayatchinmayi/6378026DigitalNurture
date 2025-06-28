@@ -1,0 +1,630 @@
+exercise 1 :table creation 
+
+MariaDB [cognizant_db]> CREATE TABLE customers (
+    ->     customer_id INT AUTO_INCREMENT PRIMARY KEY,
+    ->     customer_name VARCHAR(100) NOT NULL,
+    ->     date_of_birth DATE,
+    ->     email VARCHAR(100),
+    ->     account_balance DECIMAL(12, 2),
+    ->     is_vip ENUM('TRUE','FALSE') DEFAULT 'FALSE'
+    -> );
+Query OK, 0 rows affected (0.008 sec)
+
+MariaDB [cognizant_db]> INSERT INTO customers (customer_name, date_of_birth, email, account_balance, is_vip) VALUES
+    -> ('Chinmayi', '2004-10-26', 'chinmayi@example.com', 12500.00, 'FALSE'),
+    -> ('Gourav', '1998-10-06', 'gourav@example.com', 8500.00, 'FALSE'),
+    -> ('Debashree', '2003-06-02', 'debashree@example.com', 22000.00, 'FALSE');
+Query OK, 3 rows affected (0.004 sec)
+Records: 3  Duplicates: 0  Warnings: 0
+
+MariaDB [cognizant_db]> INSERT INTO loans (customer_id, interest_rate, due_date, amount_due, status) VALUES
+    -> (1, 7.25, DATE_ADD(CURDATE(), INTERVAL 30 DAY), 15000.00, 'ACTIVE'),
+    -> (2, 6.75, DATE_ADD(CURDATE(), INTERVAL 45 DAY), 10000.00, 'ACTIVE'),
+    -> (3, 5.50, DATE_ADD(CURDATE(), INTERVAL 60 DAY), 25000.00, 'ACTIVE');
+ERROR 1146 (42S02): Table 'cognizant_db.loans' doesn't exist
+MariaDB [cognizant_db]> CREATE TABLE IF NOT EXISTS loans (
+    ->     loan_id INT AUTO_INCREMENT PRIMARY KEY,
+    ->     customer_id INT,
+    ->     interest_rate DECIMAL(5, 2) NOT NULL,
+    ->     due_date DATE,
+    ->     amount_due DECIMAL(12, 2),
+    ->     status VARCHAR(20) DEFAULT 'ACTIVE',
+    ->     FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+    -> );
+Query OK, 0 rows affected (0.060 sec)
+
+MariaDB [cognizant_db]> INSERT INTO loans (customer_id, interest_rate, due_date, amount_due, status) VALUES
+    -> (1, 7.25, DATE_ADD(CURDATE(), INTERVAL 30 DAY), 15000.00, 'ACTIVE'),
+    -> (2, 6.75, DATE_ADD(CURDATE(), INTERVAL 45 DAY), 10000.00, 'ACTIVE'),
+    -> (3, 5.50, DATE_ADD(CURDATE(), INTERVAL 60 DAY), 25000.00, 'ACTIVE');
+Query OK, 3 rows affected (0.004 sec)
+Records: 3  Duplicates: 0  Warnings: 0
+
+MariaDB [cognizant_db]> SELECT * FROM customers
+    -> ;
++-------------+---------------+---------------+-----------------------+-----------------+--------+
+| customer_id | customer_name | date_of_birth | email                 | account_balance | is_vip |
++-------------+---------------+---------------+-----------------------+-----------------+--------+
+|           1 | Chinmayi      | 2004-10-26    | chinmayi@example.com  |        12500.00 | FALSE  |
+|           2 | Gourav        | 1998-10-06    | gourav@example.com    |         8500.00 | FALSE  |
+|           3 | Debashree     | 2003-06-02    | debashree@example.com |        22000.00 | FALSE  |
++-------------+---------------+---------------+-----------------------+-----------------+--------+
+3 rows in set (0.000 sec)
+
+MariaDB [cognizant_db]> SELECT l.loan_id, c.customer_name, l.interest_rate, l.amount_due, l.due_date
+    -> FROM loans l
+    -> JOIN customers c ON l.customer_id = c.customer_id;
++---------+---------------+---------------+------------+------------+
+| loan_id | customer_name | interest_rate | amount_due | due_date   |
++---------+---------------+---------------+------------+------------+
+|       1 | Chinmayi      |          7.25 |   15000.00 | 2025-07-24 |
+|       2 | Gourav        |          6.75 |   10000.00 | 2025-08-08 |
+|       3 | Debashree     |          5.50 |   25000.00 | 2025-08-23 |
++---------+---------------+---------------+------------+------------+
+3 rows in set (0.000 sec)
+scenario 1 :
+
+
+MariaDB [cognizant_db]> DELIMITER //
+MariaDB [cognizant_db]> CREATE PROCEDURE apply_senior_discount()
+    -> BEGIN
+    ->   UPDATE loans l
+    ->   JOIN customers c ON l.customer_id = c.customer_id
+    ->   SET l.interest_rate = GREATEST(l.interest_rate - 1, 0.5)
+    ->   WHERE TIMESTAMPDIFF(YEAR, c.date_of_birth, CURDATE()) > 60;
+    ->
+    ->   SELECT CONCAT(ROW_COUNT(), ' senior discounts applied') AS Result;
+    -> END //
+Query OK, 0 rows affected (0.007 sec)
+
+MariaDB [cognizant_db]> DELIMITER ;
+MariaDB [cognizant_db]> CALL apply_senior_discount();
++----------------------------+
+| Result                     |
++----------------------------+
+| 0 senior discounts applied |
++----------------------------+
+1 row in set (0.001 sec)
+
+Query OK, 0 rows affected (0.007 sec)
+
+MariaDB [cognizant_db]> INSERT INTO customers (customer_name, date_of_birth, email, account_balance, is_vip)
+    -> VALUES ('Ramesh Kumar', '1955-08-15', 'ramesh@example.com', 15000.00, 'FALSE');
+Query OK, 1 row affected (0.003 sec)
+
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]> INSERT INTO loans (customer_id, interest_rate, due_date, amount_due, status)
+    -> VALUES (
+    ->   (SELECT customer_id FROM customers WHERE customer_name = 'Ramesh Kumar'),
+    ->   6.5,
+    ->   DATE_ADD(CURDATE(), INTERVAL 90 DAY),
+    ->   20000.00,
+    ->   'ACTIVE'
+    -> );
+Query OK, 1 row affected (0.004 sec)
+
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]> SELECT
+    ->   c.customer_name,
+    ->   TIMESTAMPDIFF(YEAR, c.date_of_birth, CURDATE()) AS age,
+    ->   l.loan_id,
+    ->   l.interest_rate AS original_rate
+    -> FROM customers c
+    -> JOIN loans l ON c.customer_id = l.customer_id
+    -> WHERE c.customer_name = 'Ramesh Kumar';
++---------------+------+---------+---------------+
+| customer_name | age  | loan_id | original_rate |
++---------------+------+---------+---------------+
+| Ramesh Kumar  |   69 |       4 |          6.50 |
++---------------+------+---------+---------------+
+1 row in set (0.001 sec)
+
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]> CALL apply_senior_discount();
++----------------------------+
+| Result                     |
++----------------------------+
+| 1 senior discounts applied |
++----------------------------+
+1 row in set (0.004 sec)
+
+Query OK, 1 row affected (0.027 sec)
+
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]> SELECT
+    ->   c.customer_name,
+    ->   l.interest_rate AS new_rate,
+    ->   l.last_updated
+    -> FROM customers c
+    -> JOIN loans l ON c.customer_id = l.customer_id
+    -> WHERE c.customer_name = 'Ramesh Kumar';
++---------------+----------+---------------------+
+| customer_name | new_rate | last_updated        |
++---------------+----------+---------------------+
+| Ramesh Kumar  |     5.50 | 2025-06-24 10:57:12 |
++---------------+----------+---------------------+
+1 row in set (0.000 sec)
+
+MariaDB [cognizant_db]> INSERT INTO customers (customer_name, date_of_birth, email, account_balance, is_vip)
+    -> VALUES ('Priya Sharma', '1988-04-22', 'priya@example.com', 15000.00, 'FALSE');
+Query OK, 1 row affected (0.003 sec)
+
+MariaDB [cognizant_db]> SELECT
+    ->   customer_name,
+    ->   account_balance,
+    ->   is_vip AS current_vip_status
+    -> FROM customers
+    -> WHERE customer_name IN ('Priya Sharma','Chinmayi');
++---------------+-----------------+--------------------+
+| customer_name | account_balance | current_vip_status |
++---------------+-----------------+--------------------+
+| Chinmayi      |        12500.00 | FALSE              |
+| Priya Sharma  |        15000.00 | FALSE              |
++---------------+-----------------+--------------------+
+2 rows in set (0.000 sec)
+scenario 2 :
+MariaDB [cognizant_db]> DELIMITER //
+MariaDB [cognizant_db]> CREATE PROCEDURE promote_to_vip()
+    -> BEGIN
+    ->   UPDATE customers
+    ->   SET is_vip = 'TRUE'
+    ->   WHERE account_balance > 10000;
+    ->
+    ->   SELECT CONCAT(ROW_COUNT(), ' customers promoted to VIP') AS Result;
+    -> END //
+Query OK, 0 rows affected (0.007 sec)
+
+MariaDB [cognizant_db]> DELIMITER ;
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]> -- Run the procedure
+MariaDB [cognizant_db]> CALL promote_to_vip();
++-----------------------------+
+| Result                      |
++-----------------------------+
+| 4 customers promoted to VIP |
++-----------------------------+
+1 row in set (0.002 sec)
+
+Query OK, 4 rows affected (0.007 sec)
+
+MariaDB [cognizant_db]> SELECT
+    ->   customer_name,
+    ->   account_balance,
+    ->   is_vip AS new_vip_status
+    -> FROM customers
+    -> WHERE customer_name IN ('Priya Sharma', 'Amit Patel');
++---------------+-----------------+----------------+
+| customer_name | account_balance | new_vip_status |
++---------------+-----------------+----------------+
+| Priya Sharma  |        15000.00 | TRUE           |
++---------------+-----------------+----------------+
+1 row in set (0.000 sec)
+
+MariaDB [cognizant_db]> SELECT
+    ->   customer_name,
+    ->   account_balance,
+    ->   is_vip AS new_vip_status
+    -> FROM customers;
++---------------+-----------------+----------------+
+| customer_name | account_balance | new_vip_status |
++---------------+-----------------+----------------+
+| Chinmayi      |        12500.00 | TRUE           |
+| Gourav        |         8500.00 | FALSE          |
+| Debashree     |        22000.00 | TRUE           |
+| Ramesh Kumar  |        15000.00 | TRUE           |
+| Priya Sharma  |        15000.00 | TRUE           |
++---------------+-----------------+----------------+
+
+scenario 3 :
+1:the loan is due in next 30 days 
+TRUNCATE TABLE loans;
+
+INSERT INTO loans (customer_id, interest_rate, due_date, amount_due, status) VALUES
+(1, 7.5, DATE_ADD(CURDATE(), INTERVAL 10 DAY), 15000.00, 'ACTIVE'),  -- Chinmayi (due soon)
+(3, 6.8, DATE_ADD(CURDATE(), INTERVAL 25 DAY), 22000.00, 'ACTIVE'),  -- Debashree
+(4, 5.2, DATE_ADD(CURDATE(), INTERVAL 30 DAY), 18000.00, 'ACTIVE'),  -- Ramesh Kumar
+(5, 6.0, DATE_ADD(CURDATE(), INTERVAL 45 DAY), 12000.00, 'ACTIVE');  -- Priya (won't appear)
+
+
+
+DELIMITER //
+CREATE OR REPLACE PROCEDURE generate_loan_reminders()
+BEGIN
+  SELECT 
+    c.customer_id,
+    c.customer_name,
+    c.email,
+    l.loan_id,
+    l.due_date,
+    DATEDIFF(l.due_date, CURDATE()) AS days_remaining,
+    l.amount_due,
+    CONCAT(
+      'Urgent: Payment Due Soon\n',
+      '-----------------------\n',
+      'Customer: ', c.customer_name, '\n',
+      'Loan ID: ', l.loan_id, '\n',
+      'Due Date: ', DATE_FORMAT(l.due_date, '%D %M %Y'), '\n',
+      'Amount Due: ₹', FORMAT(l.amount_due, 2), '\n',
+      'Days Remaining: ', DATEDIFF(l.due_date, CURDATE()), '\n\n',
+      'Please make payment via NetBanking, Mobile App, or at your nearest branch.'
+    ) AS reminder_message,
+    CASE 
+      WHEN DATEDIFF(l.due_date, CURDATE()) <= 7 THEN 'HIGH PRIORITY'
+      WHEN DATEDIFF(l.due_date, CURDATE()) <= 14 THEN 'MEDIUM PRIORITY'
+      ELSE 'LOW PRIORITY'
+    END AS priority
+  FROM loans l
+  JOIN customers c ON l.customer_id = c.customer_id
+  WHERE l.due_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+  AND l.status = 'ACTIVE'
+  ORDER BY l.due_date;
+END //
+DELIMITER ;
+
+
+
+CALL generate_loan_reminders();
+
+
+Output:
+
++-------------+---------------+-----------------------+---------+------------+----------------+------------+---------------------------------------------------------------+----------------+
+| customer_id | customer_name | email                 | loan_id | due_date   | days_remaining | amount_due | reminder_message                                              | priority       |
++-------------+---------------+-----------------------+---------+------------+----------------+------------+---------------------------------------------------------------+----------------+
+|           1 | Chinmayi      | chinmayi@example.com  |       1 | 2023-12-05 |             10 |   15000.00 | Urgent: Payment Due Soon...                                   | MEDIUM PRIORITY|
+|           3 | Debashree     | debashree@example.com |       2 | 2023-12-20 |             25 |   22000.00 | Urgent: Payment Due Soon...                                   | LOW PRIORITY   |
+|           4 | Ramesh Kumar  | ramesh@example.com    |       3 | 2023-12-25 |             30 |   18000.00 | Urgent: Payment Due Soon...                                   | LOW PRIORITY   |
++-------------+---------------+-----------------------+---------+------------+----------------+------------+---------------------------------------------------------------+----------------+
+
+SELECT 
+  c.customer_name,
+  l.loan_id, 
+  l.due_date,
+  DATEDIFF(l.due_date, CURDATE()) AS days_remaining
+FROM loans l
+JOIN customers c ON l.customer_id = c.customer_id
+WHERE c.customer_name = 'Priya Sharma';
+
+Output:
+
++---------------+---------+------------+----------------+
+| customer_name | loan_id | due_date   | days_remaining |
++---------------+---------+------------+----------------+
+| Priya Sharma  |       4 | 2024-01-09 |             45 |
++---------------+---------+------------+----------------+
+
+
+question 3 :
+table creations :
+MariaDB [(none)]> use cognizant_db;
+Database changed
+MariaDB [cognizant_db]> -- Accounts table
+MariaDB [cognizant_db]> CREATE TABLE accounts (
+    ->     account_id INT PRIMARY KEY,
+    ->     customer_id INT,
+    ->     account_type ENUM('SAVINGS', 'CHECKING'),
+    ->     balance DECIMAL(12,2),
+    ->     FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+    -> );
+Query OK, 0 rows affected (0.034 sec)
+
+
+
+MariaDB [cognizant_db]> CREATE TABLE departments (
+    ->     department_id INT PRIMARY KEY,
+    ->     department_name VARCHAR(100)
+    -> );
+Query OK, 0 rows affected (0.008 sec)
+
+MariaDB [cognizant_db]> CREATE TABLE transactions (
+    ->     transaction_id INT AUTO_INCREMENT PRIMARY KEY,
+    ->     from_account INT,
+    ->     to_account INT,
+    ->     amount DECIMAL(12,2),
+    ->     transaction_date DATETIME,
+    ->     FOREIGN KEY (from_account) REFERENCES accounts(account_id),
+    ->     FOREIGN KEY (to_account) REFERENCES accounts(account_id)
+    -> );
+Query OK, 0 rows affected (0.024 sec)
+
+
+
+MariaDB [cognizant_db]> CREATE TABLE departments (
+    ->     ->     department_id INT PRIMARY KEY,
+    ->     ->     department_name VARCHAR(100)
+    ->     -> );
+
+MariaDB [cognizant_db]> CREATE TABLE employees (
+    ->     employee_id INT PRIMARY KEY,
+    ->     employee_name VARCHAR(100),
+    ->     department_id INT,
+    ->     salary DECIMAL(12,2),
+    ->     FOREIGN KEY (department_id) REFERENCES departments(department_id)
+    -> );
+Query OK, 0 rows affected (0.025 sec)
+
+
+MariaDB [cognizant_db]> DELIMITER ;
+MariaDB [cognizant_db]> INSERT INTO accounts (account_id, customer_id, account_type, balance) VALUES
+    -> (1001, 1, 'SAVINGS', 5000.00),
+    -> (1002, 2, 'SAVINGS', 10000.00),
+    -> (1003, 3, 'CHECKING', 7500.00),
+    -> (1004, 4, 'SAVINGS', 15000.00);
+Query OK, 4 rows affected (0.003 sec)
+Records: 4  Duplicates: 0  Warnings: 0
+
+MariaDB [cognizant_db]> INSERT INTO departments (department_id, department_name) VALUES
+    -> (1, 'Loans'),
+    -> (2, 'Customer Service'),
+    -> (3, 'IT');
+Query OK, 3 rows affected (0.006 sec)
+Records: 3  Duplicates: 0  Warnings: 0
+
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]> INSERT INTO employees (employee_id, employee_name, department_id, salary) VALUES
+    -> (101, 'Chinmayi Gantayat', 1, 50000.00),
+    -> (102, 'Gourav Gantayat', 2, 45000.00),
+    -> (103, 'Debarshree Nag', 3, 60000.00);
+Query OK, 3 rows affected (0.003 sec)
+Records: 3  Duplicates: 0  Warnings: 0
+scenario 1 :
+MariaDB [cognizant_db]> DELIMITER //
+MariaDB [cognizant_db]> CREATE PROCEDURE ProcessMonthlyInterest()
+    -> BEGIN
+    ->     -- Update savings account balances with 1% interest
+    ->     UPDATE accounts
+    ->     SET balance = balance * 1.01
+    ->     WHERE account_type = 'SAVINGS';
+    ->
+    ->     -- Return success message
+    ->     SELECT CONCAT('Monthly interest processed for ',
+    ->                  ROW_COUNT(),
+    ->                  ' savings accounts') AS Result;
+    -> END //
+Query OK, 0 rows affected (0.005 sec)
+
+MariaDB [cognizant_db]> DELIMITER ;
+scenario 2 :
+MariaDB [cognizant_db]> DELIMITER //
+MariaDB [cognizant_db]> CREATE PROCEDURE UpdateEmployeeBonus(
+    ->     IN p_department_id INT,
+    ->     IN p_bonus_percentage DECIMAL(5,2)
+    -> )
+    -> BEGIN
+    ->     -- Check if department exists
+    ->     IF NOT EXISTS (SELECT 1 FROM departments
+    ->                   WHERE department_id = p_department_id) THEN
+    ->         SELECT CONCAT('Error: Department ',
+    ->                      p_department_id,
+    ->                      ' does not exist') AS Result;
+    ->     ELSE
+    ->         -- Apply bonus to department employees
+    ->         UPDATE employees
+    ->         SET salary = salary * (1 + p_bonus_percentage/100)
+    ->         WHERE department_id = p_department_id;
+    ->
+    ->         SELECT CONCAT('Applied ', p_bonus_percentage,
+    ->                      '% bonus to ', ROW_COUNT(),
+    ->                      ' employees') AS Result;
+    ->     END IF;
+    -> END //
+Query OK, 0 rows affected (0.005 sec)
+
+MariaDB [cognizant_db]> DELIMITER ;
+scenrio 3 :
+MariaDB [cognizant_db]> DELIMITER //
+MariaDB [cognizant_db]> CREATE PROCEDURE TransferFunds(
+    ->     IN p_from_account INT,
+    ->     IN p_to_account INT,
+    ->     IN p_amount DECIMAL(12,2)
+    -> )
+    -> BEGIN
+    ->     DECLARE v_from_balance DECIMAL(12,2);
+    ->
+    ->     -- Check if accounts exist
+    ->     IF NOT EXISTS (SELECT 1 FROM accounts
+    ->                    WHERE account_id = p_from_account) THEN
+    ->         SELECT 'Error: Source account does not exist' AS Result;
+    ->     ELSEIF NOT EXISTS (SELECT 1 FROM accounts
+    ->                       WHERE account_id = p_to_account) THEN
+    ->         SELECT 'Error: Destination account does not exist' AS Result;
+    ->     ELSE
+    ->         -- Check sufficient balance
+    ->         SELECT balance INTO v_from_balance
+    ->         FROM accounts
+    ->         WHERE account_id = p_from_account;
+    ->
+    ->         IF v_from_balance < p_amount THEN
+    ->             SELECT CONCAT('Error: Insufficient funds. Available: ',
+    ->                          v_from_balance) AS Result;
+    ->         ELSE
+    ->             -- Perform transfer
+    ->             START TRANSACTION;
+    ->
+    ->             UPDATE accounts
+    ->             SET balance = balance - p_amount
+    ->             WHERE account_id = p_from_account;
+    ->
+    ->             UPDATE accounts
+    ->             SET balance = balance + p_amount
+    ->             WHERE account_id = p_to_account;
+    ->
+    ->             -- Record transaction
+    ->             INSERT INTO transactions (from_account, to_account, amount, transaction_date)
+    ->             VALUES (p_from_account, p_to_account, p_amount, NOW());
+    ->
+    ->             COMMIT;
+    ->
+    ->             SELECT CONCAT('Transfer successful. Amount: ',
+    ->                          p_amount) AS Result;
+    ->         END IF;
+    ->     END IF;
+    -> END //
+Query OK, 0 rows affected (0.005 sec)
+
+MariaDB [cognizant_db]> DELIMITER ;
+
+output of question 3 :
+
+MariaDB [cognizant_db]> -- View balances before
+MariaDB [cognizant_db]> SELECT account_id, account_type, balance
+    -> FROM accounts
+    -> WHERE account_type = 'SAVINGS';
++------------+--------------+----------+
+| account_id | account_type | balance  |
++------------+--------------+----------+
+|       1001 | SAVINGS      |  5000.00 |
+|       1002 | SAVINGS      | 10000.00 |
+|       1004 | SAVINGS      | 15000.00 |
++------------+--------------+----------+
+3 rows in set (0.001 sec)
+
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]> -- Apply 1% interest
+MariaDB [cognizant_db]> CALL ProcessMonthlyInterest();
++---------------------------------------------------+
+| Result                                            |
++---------------------------------------------------+
+| Monthly interest processed for 3 savings accounts |
++---------------------------------------------------+
+1 row in set (0.002 sec)
+
+Query OK, 3 rows affected (0.014 sec)
+
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]> -- Verify updated balances
+MariaDB [cognizant_db]> SELECT account_id, account_type, balance
+    -> FROM accounts
+    -> WHERE account_type = 'SAVINGS';
++------------+--------------+----------+
+| account_id | account_type | balance  |
++------------+--------------+----------+
+|       1001 | SAVINGS      |  5050.00 |
+|       1002 | SAVINGS      | 10100.00 |
+|       1004 | SAVINGS      | 15150.00 |
++------------+--------------+----------+
+3 rows in set (0.000 sec)
+
+MariaDB [cognizant_db]> -- View salaries before
+MariaDB [cognizant_db]> SELECT employee_id, employee_name, salary
+    -> FROM employees
+    -> WHERE department_id = 1;
++-------------+-------------------+----------+
+| employee_id | employee_name     | salary   |
++-------------+-------------------+----------+
+|         101 | Chinmayi Gantayat | 50000.00 |
++-------------+-------------------+----------+
+1 row in set (0.001 sec)
+
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]> -- Apply 5% bonus to Loans department (ID=1)
+MariaDB [cognizant_db]> CALL UpdateEmployeeBonus(1, 5.00);
++------------------------------------+
+| Result                             |
++------------------------------------+
+| Applied 5.00% bonus to 1 employees |
++------------------------------------+
+1 row in set (0.003 sec)
+
+Query OK, 1 row affected (0.018 sec)
+
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]> -- Verify updated salaries
+MariaDB [cognizant_db]> SELECT employee_id, employee_name, salary
+    -> FROM employees
+    -> WHERE department_id = 1;
++-------------+-------------------+----------+
+| employee_id | employee_name     | salary   |
++-------------+-------------------+----------+
+|         101 | Chinmayi Gantayat | 52500.00 |
++-------------+-------------------+----------+
+1 row in set (0.001 sec)
+
+MariaDB [cognizant_db]> -- View salaries before
+MariaDB [cognizant_db]> SELECT employee_id, employee_name, salary
+    -> FROM employees
+    -> WHERE department_id = 1;
++-------------+-------------------+----------+
+| employee_id | employee_name     | salary   |
++-------------+-------------------+----------+
+|         101 | Chinmayi Gantayat | 52500.00 |
++-------------+-------------------+----------+
+1 row in set (0.001 sec)
+
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]> -- Apply 5% bonus to Loans department (ID=1)
+MariaDB [cognizant_db]> CALL UpdateEmployeeBonus(1, 5.00);
++------------------------------------+
+| Result                             |
++------------------------------------+
+| Applied 5.00% bonus to 1 employees |
++------------------------------------+
+1 row in set (0.003 sec)
+
+Query OK, 1 row affected (0.017 sec)
+
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]> -- Verify updated salaries
+MariaDB [cognizant_db]> SELECT employee_id, employee_name, salary
+    -> FROM employees
+    -> WHERE department_id = 1;
++-------------+-------------------+----------+
+| employee_id | employee_name     | salary   |
++-------------+-------------------+----------+
+|         101 | Chinmayi Gantayat | 55125.00 |
++-------------+-------------------+----------+
+1 row in set (0.001 sec)
+
+MariaDB [cognizant_db]> -- View balances before transfer
+MariaDB [cognizant_db]> SELECT account_id, balance
+    -> FROM accounts
+    -> WHERE account_id IN (1001, 1002);
++------------+----------+
+| account_id | balance  |
++------------+----------+
+|       1001 |  5050.00 |
+|       1002 | 10100.00 |
++------------+----------+
+2 rows in set (0.001 sec)
+
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]> -- Transfer ₹1000 from account 1001 to 1002
+MariaDB [cognizant_db]> CALL TransferFunds(1001, 1002, 1000.00);
++--------------------------------------+
+| Result                               |
++--------------------------------------+
+| Transfer successful. Amount: 1000.00 |
++--------------------------------------+
+1 row in set (0.008 sec)
+
+Query OK, 4 rows affected (0.028 sec)
+
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]> -- Verify balances after transfer
+MariaDB [cognizant_db]> SELECT account_id, balance
+    -> FROM accounts
+    -> WHERE account_id IN (1001, 1002);
++------------+----------+
+| account_id | balance  |
++------------+----------+
+|       1001 |  4050.00 |
+|       1002 | 11100.00 |
++------------+----------+
+2 rows in set (0.000 sec)
+
+MariaDB [cognizant_db]>
+MariaDB [cognizant_db]> -- View transaction record
+MariaDB [cognizant_db]> SELECT * FROM transactions;
++----------------+--------------+------------+---------+---------------------+
+| transaction_id | from_account | to_account | amount  | transaction_date    |
++----------------+--------------+------------+---------+---------------------+
+|              1 |         1001 |       1002 | 1000.00 | 2025-06-24 11:30:19 |
++----------------+--------------+------------+---------+---------------------+
+1 row in set (0.000 sec)
+
+MariaDB [cognizant_db]>
+

@@ -1,0 +1,355 @@
+EXERCISE 1 :
+TABLE CREATION :
+CREATE TABLE customers (
+    customer_id NUMBER PRIMARY KEY,
+    customer_name VARCHAR2(100) NOT NULL,
+    date_of_birth DATE,
+    email VARCHAR2(100),
+    account_balance NUMBER(12,2),
+    is_vip VARCHAR2(5) DEFAULT 'FALSE' CHECK (is_vip IN ('TRUE', 'FALSE'))
+);
+
+ Create loans table
+CREATE TABLE loans (
+    loan_id NUMBER PRIMARY KEY,
+    customer_id NUMBER REFERENCES customers(customer_id),
+    interest_rate NUMBER(5,2) NOT NULL,
+    due_date DATE,
+    amount_due NUMBER(12,2),
+    status VARCHAR2(20) DEFAULT 'ACTIVE'
+);
+
+Insert sample data
+INSERT INTO customers VALUES (1, 'Chinmayi Gantayat', TO_DATE('26-OCT-2004', 'DD-MON-YYYY'), 'chinmayi@example.com', 12500.00, 'FALSE');
+INSERT INTO customers VALUES (2, 'Gourav Gantayat', TO_DATE('06-OCT-1998', 'DD-MON-YYYY'), 'gourav@example.com', 8500.00, 'FALSE');
+INSERT INTO customers VALUES (3, 'Debashree Nag', TO_DATE('02-JUN-2003', 'DD-MON-YYYY'), 'debashree@example.com', 22000.00, 'FALSE');
+INSERT INTO customers VALUES (4, 'Ramesh Kumar', TO_DATE('15-AUG-1955', 'DD-MON-YYYY'), 'ramesh@example.com', 15000.00, 'FALSE');
+
+INSERT INTO loans VALUES (101, 4, 6.5, ADD_MONTHS(SYSDATE, 3), 20000.00, 'ACTIVE');
+INSERT INTO loans VALUES (102, 3, 5.5, ADD_MONTHS(SYSDATE, 1), 15000.00, 'ACTIVE');
+INSERT INTO loans VALUES (103, 1, 7.0, ADD_MONTHS(SYSDATE, 6), 10000.00, 'ACTIVE');
+
+
+Scenario 1: Senior Discount (Age > 60)
+
+sql
+DECLARE
+    CURSOR cust_cursor IS
+        SELECT c.customer_id, l.loan_id, l.interest_rate
+        FROM customers c
+        JOIN loans l ON c.customer_id = l.customer_id
+        WHERE MONTHS_BETWEEN(SYSDATE, c.date_of_birth)/12 > 60;
+    
+    v_discount_rate NUMBER := 1; -- 1% discount
+    v_count NUMBER := 0;
+BEGIN
+    FOR cust_rec IN cust_cursor LOOP
+        UPDATE loans
+        SET interest_rate = GREATEST(interest_rate - v_discount_rate, 0.5)
+        WHERE loan_id = cust_rec.loan_id;
+        
+        v_count := v_count + 1;
+        DBMS_OUTPUT.PUT_LINE('Applied 1% discount to customer ID ' || cust_rec.customer_id || 
+                            ', Loan ID ' || cust_rec.loan_id || 
+                            '. New rate: ' || (cust_rec.interest_rate - v_discount_rate) || '%');
+    END LOOP;
+    
+    IF v_count = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('No customers over 60 found with active loans');
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('Total discounts applied: ' || v_count);
+    END IF;
+END;
+/
+ Scenario 2: VIP Promotion (Balance > $10,000)
+
+sql
+DECLARE
+    CURSOR vip_cursor IS
+        SELECT customer_id, customer_name, account_balance
+        FROM customers
+        WHERE account_balance > 10000
+        AND is_vip = 'FALSE';
+    
+    v_count NUMBER := 0;
+BEGIN
+    FOR vip_rec IN vip_cursor LOOP
+        UPDATE customers
+        SET is_vip = 'TRUE'
+        WHERE customer_id = vip_rec.customer_id;
+        
+        v_count := v_count + 1;
+        DBMS_OUTPUT.PUT_LINE('Promoted ' || vip_rec.customer_name || 
+                            ' (ID: ' || vip_rec.customer_id || 
+                            ') to VIP. Balance: $' || vip_rec.account_balance);
+    END LOOP;
+    
+    IF v_count = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('No customers qualified for VIP promotion');
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('Total VIP promotions: ' || v_count);
+    END IF;
+END;
+/
+ Scenario 3: Loan Reminders (Due in 30 Days)
+
+DECLARE
+    CURSOR due_loans_cursor IS
+        SELECT c.customer_name, c.email, l.loan_id, l.amount_due, l.due_date
+        FROM loans l
+        JOIN customers c ON l.customer_id = c.customer_id
+        WHERE l.due_date BETWEEN SYSDATE AND SYSDATE + 30
+        AND l.status = 'ACTIVE';
+    
+    v_count NUMBER := 0;
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('=== Loan Payment Reminders ===');
+    DBMS_OUTPUT.PUT_LINE('');
+    
+    FOR loan_rec IN due_loans_cursor LOOP
+        v_count := v_count + 1;
+        DBMS_OUTPUT.PUT_LINE('To: ' || loan_rec.email);
+        DBMS_OUTPUT.PUT_LINE('Subject: Payment Due for Loan #' || loan_rec.loan_id);
+        DBMS_OUTPUT.PUT_LINE('');
+        DBMS_OUTPUT.PUT_LINE('Dear ' || loan_rec.customer_name || ',');
+        DBMS_OUTPUT.PUT_LINE('');
+        DBMS_OUTPUT.PUT_LINE('Your payment of $' || loan_rec.amount_due || 
+                            ' for Loan #' || loan_rec.loan_id || 
+                            ' is due on ' || TO_CHAR(loan_rec.due_date, 'DD-MON-YYYY') || '.');
+        DBMS_OUTPUT.PUT_LINE('Please make your payment to avoid late fees.');
+        DBMS_OUTPUT.PUT_LINE('');
+        DBMS_OUTPUT.PUT_LINE('Sincerely,');
+        DBMS_OUTPUT.PUT_LINE('Your Bank');
+        DBMS_OUTPUT.PUT_LINE('----------------------------------------');
+    END LOOP;
+    
+    IF v_count = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('No loans due in the next 30 days');
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('Total reminders sent: ' || v_count);
+    END IF;
+END;
+/
+
+
+Key Features:
+
+1. Complete Table Setup: Includes CREATE TABLE and sample INSERT statements
+2. Proper PL/SQL Blocks: Uses DECLARE-BEGIN-END structure with cursors
+3. Error Handling: Checks for zero records processed
+4. Detailed Output: Provides clear messages about each operation
+5. Realistic Logic: Includes minimum interest rate (0.5%) and balance checks
+
+
+
+
+exrcise 3 :
+ PL/SQL Stored Procedures
+ Create accounts table for savings/checking accounts
+CREATE TABLE accounts (
+    account_id NUMBER PRIMARY KEY,
+    customer_id NUMBER REFERENCES customers(customer_id),
+    account_type VARCHAR2(20) CHECK (account_type IN ('SAVINGS', 'CHECKING')),
+    balance NUMBER(12,2) DEFAULT 0,
+    open_date DATE DEFAULT SYSDATE
+);
+
+-- Create employees table for bonus processing
+CREATE TABLE employees (
+    employee_id NUMBER PRIMARY KEY,
+    employee_name VARCHAR2(100) NOT NULL,
+    department_id NUMBER,
+    salary NUMBER(10,2),
+    hire_date DATE
+);
+
+-- Create departments table
+CREATE TABLE departments (
+    department_id NUMBER PRIMARY KEY,
+    department_name VARCHAR2(50) NOT NULL
+);
+
+-- Create transactions table for fund transfers
+CREATE TABLE transactions (
+    transaction_id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    from_account NUMBER REFERENCES accounts(account_id),
+    to_account NUMBER REFERENCES accounts(account_id),
+    amount NUMBER(12,2),
+    transaction_date TIMESTAMP DEFAULT SYSTIMESTAMP,
+    status VARCHAR2(20)
+);
+
+
+
+-- Insert sample accounts
+INSERT INTO accounts VALUES (1001, 1, 'SAVINGS', 15000, TO_DATE('01-JAN-2022', 'DD-MON-YYYY'));
+INSERT INTO accounts VALUES (1002, 2, 'SAVINGS', 8500, TO_DATE('15-MAR-2022', 'DD-MON-YYYY'));
+INSERT INTO accounts VALUES (1003, 3, 'CHECKING', 22000, TO_DATE('10-FEB-2023', 'DD-MON-YYYY'));
+INSERT INTO accounts VALUES (1004, 4, 'SAVINGS', 50000, TO_DATE('05-DEC-2021', 'DD-MON-YYYY'));
+
+-- Insert departments
+INSERT INTO departments VALUES (1, 'Retail Banking');
+INSERT INTO departments VALUES (2, 'Loan Department');
+INSERT INTO departments VALUES (3, 'Operations');
+
+-- Insert employees
+INSERT INTO employees VALUES (101, 'Priya Sharma', 1, 45000, TO_DATE('15-JUN-2020', 'DD-MON-YYYY'));
+INSERT INTO employees VALUES (102, 'Rahul Verma', 2, 52000, TO_DATE('22-MAR-2021', 'DD-MON-YYYY'));
+INSERT INTO employees VALUES (103, 'Neha Patel', 1, 48000, TO_DATE('10-SEP-2022', 'DD-MON-YYYY'));
+```
+
+Scenario 1: Process Monthly Interest (1%)
+
+
+CREATE OR REPLACE PROCEDURE ProcessMonthlyInterest AS
+    v_interest_rate NUMBER := 0.01; -- 1% monthly interest
+    v_updated_count NUMBER := 0;
+BEGIN
+    -- Update savings accounts with interest
+    UPDATE accounts
+    SET balance = balance * (1 + v_interest_rate)
+    WHERE account_type = 'SAVINGS';
+    
+    v_updated_count := SQL%ROWCOUNT;
+    
+    -- Record the transaction
+    INSERT INTO transactions (from_account, to_account, amount, status)
+    SELECT NULL, account_id, balance * v_interest_rate, 'INTEREST'
+    FROM accounts
+    WHERE account_type = 'SAVINGS';
+    
+    DBMS_OUTPUT.PUT_LINE('Monthly interest processed for ' || v_updated_count || ' savings accounts');
+    COMMIT;
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Error processing interest: ' || SQLERRM);
+        ROLLBACK;
+END ProcessMonthlyInterest;
+/
+
+-- Execute the procedure
+EXEC ProcessMonthlyInterest;
+
+ Scenario 2: Update Employee Bonus by Department
+
+CREATE OR REPLACE PROCEDURE UpdateEmployeeBonus(
+    p_dept_id IN NUMBER,
+    p_bonus_percent IN NUMBER
+) AS
+    v_department_exists NUMBER;
+    v_updated_count NUMBER := 0;
+BEGIN
+    -- Check if department exists
+    SELECT COUNT(*) INTO v_department_exists
+    FROM departments
+    WHERE department_id = p_dept_id;
+    
+    IF v_department_exists = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('Error: Department ' || p_dept_id || ' does not exist');
+    ELSE
+        -- Update salaries with bonus
+        UPDATE employees
+        SET salary = salary * (1 + (p_bonus_percent/100))
+        WHERE department_id = p_dept_id;
+        
+        v_updated_count := SQL%ROWCOUNT;
+        DBMS_OUTPUT.PUT_LINE('Applied ' || p_bonus_percent || '% bonus to ' || 
+                           v_updated_count || ' employees in department ' || p_dept_id);
+        COMMIT;
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Error updating bonuses: ' || SQLERRM);
+        ROLLBACK;
+END UpdateEmployeeBonus;
+/
+
+EXEC UpdateEmployeeBonus(1, 10);
+
+
+Scenario 3: Transfer Funds Between Accounts
+
+```sql
+CREATE OR REPLACE PROCEDURE TransferFunds(
+    p_from_account IN NUMBER,
+    p_to_account IN NUMBER,
+    p_amount IN NUMBER
+) AS
+    v_from_balance NUMBER;
+    v_from_exists NUMBER;
+    v_to_exists NUMBER;
+BEGIN
+    -- Check if accounts exist
+    SELECT COUNT(*) INTO v_from_exists FROM accounts WHERE account_id = p_from_account;
+    SELECT COUNT(*) INTO v_to_exists FROM accounts WHERE account_id = p_to_account;
+    
+    IF v_from_exists = 0 OR v_to_exists = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('Error: One or both accounts do not exist');
+        RETURN;
+    END IF;
+    
+    -- Get current balance
+    SELECT balance INTO v_from_balance 
+    FROM accounts 
+    WHERE account_id = p_from_account;
+    
+    -- Check sufficient balance
+    IF v_from_balance < p_amount THEN
+        DBMS_OUTPUT.PUT_LINE('Error: Insufficient funds in source account');
+        RETURN;
+    END IF;
+    
+    -- Perform transfer
+    BEGIN
+        UPDATE accounts SET balance = balance - p_amount WHERE account_id = p_from_account;
+        UPDATE accounts SET balance = balance + p_amount WHERE account_id = p_to_account;
+        
+        -- Record transaction
+        INSERT INTO transactions (from_account, to_account, amount, status)
+        VALUES (p_from_account, p_to_account, p_amount, 'COMPLETED');
+        
+        COMMIT;
+        DBMS_OUTPUT.PUT_LINE('Successfully transferred ' || p_amount || 
+                            ' from account ' || p_from_account || 
+                            ' to account ' || p_to_account);
+    EXCEPTION
+        WHEN OTHERS THEN
+            ROLLBACK;
+            DBMS_OUTPUT.PUT_LINE('Transfer failed: ' || SQLERRM);
+    END;
+END TransferFunds;
+/
+
+-- Example execution (transfer 5000 from account 1001 to 1004)
+EXEC TransferFunds(1001, 1004, 5000);
+```
+ Verification Queries
+
+
+-- Verify interest application
+SELECT account_id, customer_id, balance 
+FROM accounts 
+WHERE account_type = 'SAVINGS';
+
+-- Verify bonus application
+SELECT employee_id, employee_name, salary 
+FROM employees 
+WHERE department_id = 1;
+
+-- Verify fund transfer
+SELECT * FROM accounts WHERE account_id IN (1001, 1004);
+SELECT * FROM transactions ORDER BY transaction_date DESC;
+```
+
+These stored procedures provide complete solutions for:
+1. Automated monthly interest calculation
+2. Department-specific bonus processing
+3. Secure fund transfers with balance validation
+
+Each procedure includes:
+- Parameter validation
+- Transaction management (COMMIT/ROLLBACK)
+- Detailed error handling
+- Success/failure notifications
+
+
