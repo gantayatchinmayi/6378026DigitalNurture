@@ -1,0 +1,100 @@
+1. Hibernate Implementation (Manual)
+public Integer addEmployee(Employee employee) {
+    Session session = factory.openSession();
+    Transaction tx = null;
+    Integer employeeID = null;
+    
+    try {
+        tx = session.beginTransaction();
+        employeeID = (Integer) session.save(employee); // Manual save
+        tx.commit();
+    } catch (HibernateException e) {
+        if (tx != null) tx.rollback(); // Manual rollback
+        e.printStackTrace(); 
+    } finally {
+        session.close(); // Manual resource cleanup
+    }
+    return employeeID;
+}
+
+Key Characteristics:
+- Boilerplate Code: Manual session/transaction management.
+- Error-Prone: Requires explicit `try-catch-finally` blocks.
+- Hibernate-Specific: Uses Hibernate's `Session` API directly
+
+2. Spring Data JPA Implementation
+EmployeeRepository.java:
+
+public interface EmployeeRepository 
+    extends JpaRepository<Employee, Integer> { 
+    // Zero code! Inherits CRUD methods like save(), findAll(), etc.
+}
+
+
+EmployeeService.java:
+
+@Service
+public class EmployeeService {
+
+    @Autowired
+    private EmployeeRepository employeeRepository;
+
+    @Transactional // Auto-managed transaction
+    public Employee addEmployee(Employee employee) {
+        return employeeRepository.save(employee); // Single line!
+    }
+}
+```
+Key Advantages
+1. No Boilerplate:
+   - No manual Session/Transaction handling.
+   - Spring auto-manages connections and transactions.
+
+2. Concise:
+   - save() method provided by JpaRepository.
+   - Returns the saved entity (with generated ID).
+
+3. Standardized:
+   - Uses JPA specifications (not Hibernate-specific).
+
+4. Auto-Transaction:
+   - @Transactional handles commit/rollback automatically.
+Here's a concise, copy-paste friendly version of the key differences:
+
+Hibernate (Manual) vs Spring Data JPA:differences
+
+1. Code Style  
+   - Hibernate: Verbose (manual sessions/transactions)  
+   - Spring JPA: Minimal (auto-managed)
+
+2. Transactions 
+   - Hibernate: Manual begin/commit/rollback  
+   - Spring JPA: '@Transactional' auto-handling
+
+3. CRUD Operations  
+   - Hibernate: Manual 'session.save()'  
+   - Spring JPA: Built-in 'repository.save()'
+
+4. Error Handling  
+   - Hibernate: Manual try-catch blocks  
+   - Spring JPA: Automatic rollback
+
+5. Persistence API 
+   - Hibernate: Uses 'Session'  
+   - Spring JPA: Uses 'EntityManager'
+
+6. Boilerplate  
+   - Hibernate: High (cleanup required)  
+   - Spring JPA: Low (auto-close)
+
+7. Best For  
+   - Hibernate: Complex low-level ops  
+   - Spring JPA: Rapid CRUD development
+
+
+When to Use Which?
+- Spring Data JPA: Preferred for most applications (simpler, less code).
+- Hibernate API: Needed for complex queries or low-level control.
+
+
+Both approaches work, but Spring Data JPA dramatically reduces boilerplate while maintaining all power of JPA/Hibernate.
